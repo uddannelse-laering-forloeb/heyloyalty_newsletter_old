@@ -1,0 +1,5 @@
+name = Heyloyalty newsletter
+description = Holds configuration and feed for Heyloyalty
+package = Ulf Addons
+core = 7.x
+dependencies[] = ulf_admin_panel

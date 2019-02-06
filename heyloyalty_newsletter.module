@@ -1,0 +1,180 @@
+<?php
+/**
+ * @file
+ *
+ * Code related to Heyloyalty newsletter system.
+ */
+
+/**
+ * Implements hook_menu().
+ * 
+ * Add path for content feed.
+ */
+function heyloyalty_newsletter_menu() {
+  $items = array();
+
+  $items['feed/json/node'] = array(
+    'page callback' => '_heyloyalty_newsletter_feed_json_node',
+    'access arguments' => array(
+      'access content',
+    )
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_ctools_plugin_api().
+ */
+function heyloyalty_newsletter_ctools_plugin_api($module, $api) {
+  if ($module == "ctools_custom_content" && $api == "ctools_content") {
+    return array("version" => "1");
+  }
+}
+
+/**
+ * Implements hook_theme().
+ */
+function heyloyalty_newsletter_theme() {
+  return array(
+    'heyloyalty_pane_content' => array(
+      'template' => 'heyloyalty-pane-content',
+      'variables' => array('iframe' => NULL, 'height' => NULL),
+      'path' => drupal_get_path('module', 'heyloyalty_newsletter') . '/templates'
+    ),
+    'heyloyalty_block_content' => array(
+      'template' => 'heyloyalty-block-content',
+      'variables' => array('iframe' => NULL, 'height' => NULL),
+      'path' => drupal_get_path('module', 'heyloyalty_newsletter') . '/templates'
+    ),
+  );
+}
+
+/**
+ * Implements hook_block_info().
+ */
+function heyloyalty_newsletter_block_info() {
+  $blocks['heyloyalty-newsletter-signup'] = array(
+    'info' => t('Heyloyalty signup'),
+    'cache' => DRUPAL_NO_CACHE,
+  );
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function heyloyalty_newsletter_block_view($delta = '') {
+  $body_content = [
+    '#theme' => 'heyloyalty_block_content',
+    '#name' => 'heyloyalty_signup',
+    '#iframe' => variable_get('heyloyalty_signup', '')['value'],
+    '#height' => variable_get('heyloyalty_signup_height_sidebar', ''),
+  ];
+
+  $block = array();
+  switch ($delta) {
+    case 'heyloyalty-newsletter-signup':
+      $block['subject'] = t('Heyloyalty signup');
+      $block['content'] = $body_content;
+      break;
+  }
+  return $block;
+}
+
+/**
+ * Implements hook_form_FORMID_alter().
+ */
+function heyloyalty_newsletter_form__ulf_admin_panel_form_alter(&$form, &$form_state) {
+  $form['heyloyalty'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Heyloyalty'),
+    '#weight' => 12,
+    '#collapsible' => TRUE,
+    '#group' => 'ulf_admin_panel',
+  );
+  $form['heyloyalty']['heyloyalty_signup'] = array(
+    '#type' => 'text_format',
+    '#title' => t('Newsletter signup iframe'),
+    '#description' => t('The newsletter signup iframe embed code from Heyloyalty'),
+    '#default_value' => !empty(variable_get('heyloyalty_signup', '')['value']) ? variable_get('heyloyalty_signup', '')['value'] : '',
+    '#format' => 'full_html',
+    '#attributes' => array('placeholder' => array('<iframe frameborder="0" width="600" height="600" src="https://app.heyloyalty.com/subscribe/ABC/XYZ"></iframe>'))
+  );
+  $form['heyloyalty']['heyloyalty_signup_height'] = array(
+    '#type' => 'textfield',
+    '#size' => 60,
+    '#title' => t('Newsletter signup iframe height'),
+    '#description' => t('The iframe height has to be set manually since drupal has no way of knowing the content within the iframe.'),
+    '#default_value' => !empty(variable_get('heyloyalty_signup_height', '')) ? variable_get('heyloyalty_signup_height', '') : '',
+    '#attributes' => array('placeholder' => array('325px'))
+  );
+  $form['heyloyalty']['heyloyalty_signup_enable_sidebar'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable sidebar signup on static pages'),
+    '#description' => t('Check this to show sidebar signup iframe on static pages.'),
+    '#default_value' => variable_get('heyloyalty_signup_enable_sidebar', '')
+  );
+  $form['heyloyalty']['heyloyalty_signup_height_sidebar'] = array(
+    '#type' => 'textfield',
+    '#size' => 60,
+    '#title' => t('Newsletter signup iframe height (sidebar)'),
+    '#description' => t('The iframe height has to be set manually since drupal has no way of knowing the content within the iframe.'),
+    '#default_value' => !empty(variable_get('heyloyalty_signup_height_sidebar', '')) ? variable_get('heyloyalty_signup_height_sidebar', '') : '',
+    '#attributes' => array('placeholder' => array('325px'))
+  );
+}
+
+/**
+ * Provide a json feed for newsletter.
+ *
+ * @return array
+ *   An array of items to display in the feed.
+ */
+function _heyloyalty_newsletter_feed_json_node() {
+  $content_types = array(
+    'course',
+    'course_educators'
+  );
+  $base_url = $GLOBALS['base_url'];
+
+  // Cache the page.
+  $newsletter_nodes = &drupal_static(__FUNCTION__);
+  if (!isset($newsletter_nodes)) {
+    if ($cache = cache_get('heyloyalty_feed_data')) {
+      $newsletter_nodes = $cache->data;
+    }
+    else {
+      // Fetch the relevant nodes.
+      $node_query = new EntityFieldQuery();
+      $node_query->entityCondition('entity_type', 'node');
+      $node_query->entityCondition('bundle', $content_types, 'IN');
+      $node_query->propertyCondition('status', 1);
+      $res = $node_query->execute();
+
+      $newsletter_nodes = array();
+      foreach ($res['node'] as $value) {
+        $wrapper = entity_metadata_wrapper('node', $value->nid);
+        $node = array(
+          'Produktid' => $value->nid,
+          'Produktnavn' => $wrapper->title->value(array('sanitize' => TRUE)),
+          'Beskrivelse' => !empty($wrapper->field_full_description->value()['safe_value']) ? $wrapper->field_full_description->value()['safe_value'] : '',
+          'BilledeUrl' => image_style_url('node_display', $wrapper->field_image->value()['0']['uri']),
+          'BilledeUrlTeaser' => image_style_url('teaser_display', $wrapper->field_image->value()['0']['uri']),
+          'KategoriNavn' => $wrapper->field_subject->label(),
+          'Gratis' => $wrapper->field_free->value() ? 'free' : 'not_free',
+          'Url' => $base_url . '/' .drupal_get_path_alias('node/' . $value->nid),
+          'BaseUrl' => $base_url,
+          'Author' => $wrapper->author->field_profile_name->value(),
+          'AuthorUrl' => $wrapper->author->uid->value()
+        );
+
+        $newsletter_nodes[] = $node;
+      }
+      cache_set('heyloyalty_feed_data', $newsletter_nodes, 'cache');
+    }
+  }
+
+  drupal_json_output($newsletter_nodes);
+  drupal_exit();
+}
