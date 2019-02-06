@@ -167,7 +167,7 @@ function _heyloyalty_newsletter_feed_json_node() {
           'BaseUrl' => $base_url,
           'Author' => $wrapper->author->field_profile_name->value(),
           'AuthorUrl' => $wrapper->author->uid->value(),
-          'target_group' => !empty($wrapper->field_target_group) ? $wrapper->field_target_group->label() : 'Kursus',
+          'targetGroup' => !empty($wrapper->field_target_group) ? $wrapper->field_target_group->label() : 'Kursus',
         );
 
         $newsletter_nodes[] = $node;
