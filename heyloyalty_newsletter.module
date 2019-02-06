@@ -166,7 +166,8 @@ function _heyloyalty_newsletter_feed_json_node() {
           'Url' => $base_url . '/' .drupal_get_path_alias('node/' . $value->nid),
           'BaseUrl' => $base_url,
           'Author' => $wrapper->author->field_profile_name->value(),
-          'AuthorUrl' => $wrapper->author->uid->value()
+          'AuthorUrl' => $wrapper->author->uid->value(),
+          'target_group' => !empty($wrapper->field_target_group) ? $wrapper->field_target_group->label() : 'Kursus',
         );
 
         $newsletter_nodes[] = $node;
