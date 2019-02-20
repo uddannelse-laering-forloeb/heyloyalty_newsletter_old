@@ -209,8 +209,8 @@ function _heyloyalty_newsletter_get_nodes($content_types, $cache_label, $context
         $node = array(
           'Produktid' => $value->nid,
           'Produktnavn' => $wrapper->title->value(array('sanitize' => TRUE)),
-          'BilledeUrl' => image_style_url('node_display', $wrapper->field_image->value()['0']['uri']),
-          'BilledeUrlTeaser' => image_style_url('teaser_display', $wrapper->field_image->value()['0']['uri']),
+          'BilledeUrl' => isset($wrapper->field_image->value()['0']) ? image_style_url('node_display', $wrapper->field_image->value()['0']['uri']) : '',
+          'BilledeUrlTeaser' => isset($wrapper->field_image->value()['0']) ? image_style_url('teaser_display', $wrapper->field_image->value()['0']['uri']) : '',
           'Url' => $base_url . '/' .drupal_get_path_alias('node/' . $value->nid),
           'BaseUrl' => $base_url,
           'Author' => $wrapper->author->field_profile_name->value(),

@@ -6,7 +6,7 @@ function heyloyalty_newsletter_default_ctools_custom_content() {
   $body_content = [
     '#theme' => 'heyloyalty_pane_content',
     '#name' => 'heyloyalty_signup',
-    '#iframe' => variable_get('heyloyalty_signup', '')['value'],
+    '#iframe' => isset(variable_get('heyloyalty_signup', '')['value']) ? variable_get('heyloyalty_signup', '')['value'] : '',
     '#height' => variable_get('heyloyalty_signup_height', ''),
   ];
   $export = array();
