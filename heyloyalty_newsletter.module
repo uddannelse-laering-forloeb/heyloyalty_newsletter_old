@@ -13,8 +13,15 @@
 function heyloyalty_newsletter_menu() {
   $items = array();
 
-  $items['feed/json/node'] = array(
-    'page callback' => '_heyloyalty_newsletter_feed_json_node',
+  $items['feed/json/node/course'] = array(
+    'page callback' => '_heyloyalty_newsletter_feed_json_course',
+    'access arguments' => array(
+      'access content',
+    )
+  );
+
+  $items['feed/json/node/news'] = array(
+    'page callback' => '_heyloyalty_newsletter_feed_json_news',
     'access arguments' => array(
       'access content',
     )
@@ -126,22 +133,66 @@ function heyloyalty_newsletter_form__ulf_admin_panel_form_alter(&$form, &$form_s
 }
 
 /**
- * Provide a json feed for newsletter.
+ * Provide a json feed with courses for newsletter.
  *
  * @return array
  *   An array of items to display in the feed.
  */
-function _heyloyalty_newsletter_feed_json_node() {
+function _heyloyalty_newsletter_feed_json_course() {
   $content_types = array(
     'course',
     'course_educators'
   );
+
+  $cache_label = 'heyloyalty_feed_data_course';
+
+  $newsletter_nodes = _heyloyalty_newsletter_get_nodes($content_types, $cache_label, 'course');
+
+  drupal_json_output($newsletter_nodes);
+  drupal_exit();
+}
+
+
+/**
+ * Provide a json feed with news for newsletter.
+ *
+ * @return array
+ *   An array of items to display in the feed.
+ */
+function _heyloyalty_newsletter_feed_json_news() {
+  $content_types = array(
+    'news',
+    'news_course_provider'
+  );
+
+  $cache_label = 'heyloyalty_feed_data_news';
+
+  $newsletter_nodes = _heyloyalty_newsletter_get_nodes($content_types, $cache_label, 'news');
+
+  drupal_json_output($newsletter_nodes);
+  drupal_exit();
+}
+
+/**
+ * Get a list of nodes from an entity query.
+ *
+ * @param $content_types
+ *   The types of nodes to get.
+ * @param $cache_label
+ *   The name of the cache store.
+ * @param $context
+ *   The origin of the call.
+ *
+ * @return array
+ *   An array of nodes and som specific fields.
+ */
+function _heyloyalty_newsletter_get_nodes($content_types, $cache_label, $context) {
   $base_url = $GLOBALS['base_url'];
 
   // Cache the page.
   $newsletter_nodes = &drupal_static(__FUNCTION__);
   if (!isset($newsletter_nodes)) {
-    if ($cache = cache_get('heyloyalty_feed_data')) {
+    if ($cache = cache_get($cache_label)) {
       $newsletter_nodes = $cache->data;
     }
     else {
@@ -158,24 +209,78 @@ function _heyloyalty_newsletter_feed_json_node() {
         $node = array(
           'Produktid' => $value->nid,
           'Produktnavn' => $wrapper->title->value(array('sanitize' => TRUE)),
-          'Beskrivelse' => !empty($wrapper->field_full_description->value()['safe_value']) ? $wrapper->field_full_description->value()['safe_value'] : '',
           'BilledeUrl' => image_style_url('node_display', $wrapper->field_image->value()['0']['uri']),
           'BilledeUrlTeaser' => image_style_url('teaser_display', $wrapper->field_image->value()['0']['uri']),
-          'KategoriNavn' => $wrapper->field_subject->label(),
-          'Gratis' => $wrapper->field_free->value() ? 'free' : 'not_free',
           'Url' => $base_url . '/' .drupal_get_path_alias('node/' . $value->nid),
           'BaseUrl' => $base_url,
           'Author' => $wrapper->author->field_profile_name->value(),
           'AuthorUrl' => $wrapper->author->uid->value(),
-          'targetGroup' => !empty($wrapper->field_target_group) ? $wrapper->field_target_group->label() : 'Kursus',
         );
 
+        // Add specific fields for courses
+        if ($context == 'course') {
+          $node['Beskrivelse'] = !empty($wrapper->field_full_description->value()['safe_value']) ? $wrapper->field_full_description->value()['safe_value'] : '';
+          $node['KategoriNavn'] = $wrapper->field_subject->label();
+          $node['Gratis'] = $wrapper->field_free->value() ? 'free' : 'not_free';
+          $node['targetGroup'] = !empty($wrapper->field_target_group) ? $wrapper->field_target_group->label() : 'Kursus';
+          $node['targetGroupSub'] = !empty($wrapper->field_target_group_sub) ? _heyloyalty_newsletter_render_target_group_sub($wrapper->field_target_group_sub->value()) : '';
+        }
+
+        // Add specific fields for news
+        if ($context == 'news') {
+          $node['Beskrivelse'] = !empty($wrapper->field_content->value()['safe_value']) ? $wrapper->field_content->value()['safe_value'] : '';
+          $node['Manchet'] = !empty($wrapper->field_teaser->value()) ? $wrapper->field_teaser->value() : '';
+        }
+
+        // Add node to array
         $newsletter_nodes[] = $node;
       }
-      cache_set('heyloyalty_feed_data', $newsletter_nodes, 'cache');
+      cache_set($cache_label, $newsletter_nodes, 'cache');
+    }
+  }
+  return $newsletter_nodes;
+}
+
+
+
+/**
+ * Implements hook_views_post_render().
+ */
+function _heyloyalty_newsletter_render_target_group_sub($target_groups) {
+  $classes = [];
+  $years = [];
+  $other_results = [];
+  $output = '';
+
+  foreach ($target_groups as $value) {
+    $name = $value->name;
+
+    if (preg_match('/.{1,2} år/', $name) ) {
+      $years[] = str_replace('. år', '', $name);
+    }
+    else if (preg_match('/.{1,2}\. klasse/', $name) ) {
+      $classes[] = str_replace('. klasse', '', $name);
+    }
+    else {
+      $other_results[] = $name;
     }
   }
 
-  drupal_json_output($newsletter_nodes);
-  drupal_exit();
+  $ranges = _ulf_default_create_ranges($classes, '. klasse', '. - ');
+  $yearRanges = _ulf_default_create_ranges($years, ' år');
+
+  if (!empty($ranges)) {
+    $output .= implode('<br>', $ranges) . '<br>';
+  }
+
+  if (!empty($yearRanges)) {
+    $output .= implode('<br>', $yearRanges) . '<br>';
+  }
+
+  if (!empty($other_results)) {
+    $output .= implode('<br>', $other_results);
+  }
+
+
+  return $output;
 }
