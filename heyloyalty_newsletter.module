@@ -220,22 +220,26 @@ function _heyloyalty_newsletter_get_nodes($content_types, $cache_label, $context
         // Add specific fields for courses
         if ($context == 'course') {
           $node['Beskrivelse'] = !empty($wrapper->field_full_description->value()['safe_value']) ? $wrapper->field_full_description->value()['safe_value'] : '';
+          $stripped_descr = strip_tags($node['Beskrivelse']);
           $node['KategoriNavn'] = $wrapper->field_subject->label();
           $node['Gratis'] = $wrapper->field_free->value() ? 'free' : 'not_free';
           $node['targetGroup'] = !empty($wrapper->field_target_group) ? $wrapper->field_target_group->label() : 'Kursus';
           $node['targetGroupSub'] = !empty($wrapper->field_target_group_sub) ? _heyloyalty_newsletter_render_target_group_sub($wrapper->field_target_group_sub->value()) : '';
+          $node['Beskrivelse_cut'] = strlen($stripped_descr) > 254 ? preg_replace('/\s+?(\S+)?$/', '', mb_substr($stripped_descr, 0, 251)) . '...' : $stripped_descr;
         }
 
         // Add specific fields for news
         if ($context == 'news') {
           $node['Beskrivelse'] = !empty($wrapper->field_content->value()['safe_value']) ? $wrapper->field_content->value()['safe_value'] : '';
+          $stripped_descr = strip_tags($node['Beskrivelse']);
+          $node['Beskrivelse_cut'] = strlen($stripped_descr) > 254 ? preg_replace('/\s+?(\S+)?$/', '', mb_substr($stripped_descr, 0, 251)) . '...' : $stripped_descr;
           $node['Manchet'] = !empty($wrapper->field_teaser->value()) ? $wrapper->field_teaser->value() : '';
         }
 
         // Add node to array
         $newsletter_nodes[] = $node;
       }
-      cache_set($cache_label, $newsletter_nodes, 'cache');
+      cache_set($cache_label, $newsletter_nodes, 'cache', CACHE_TEMPORARY);
     }
   }
   return $newsletter_nodes;
